@@ -1,24 +1,21 @@
-
-from database.connection import get_db_connection
+from connection2 import CONN, CURSOR
+from author import Author 
 
 class Magazine:
-    def _init_(self, name, category):
-        self._name = name
-        self._category = category
-        self._id = self.create_magazine()
-
-    def create_magazine(self):
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('INSERT INTO magazines (name, category) VALUES (?, ?)', (self._name, self._category))
-        conn.commit()
-        magazine_id = cursor.lastrowid
-        conn.close()
-        return magazine_id
+    def __init__(self, name, category, id=None):
+        self._id = id
+        self.name = name
+        self.category = category
 
     @property
     def id(self):
         return self._id
+
+    @id.setter
+    def id(self, value):
+        if not isinstance(value, int):
+            raise ValueError("ID must be of type int")
+        self._id = value
 
     @property
     def name(self):
@@ -26,53 +23,49 @@ class Magazine:
 
     @name.setter
     def name(self, value):
-        if isinstance(value, str) and 2 <= len(value) <= 16:
-            self._name = value
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute('UPDATE magazines SET name = ? WHERE id = ?', (self._name, self._id))
-            conn.commit()
-            conn.close()
-        else:
-            raise ValueError("Name must be a string between 2 and 16 characters")
+        if not isinstance(value, str):
+            raise ValueError("Name must be a string")
+        if len(value) < 2 or len(value) > 16:
+            raise ValueError("Name must be between 2 and 16 characters, inclusive")
+        self._name = value
 
     @property
     def category(self):
         return self._category
-
+    
     @category.setter
     def category(self, value):
-        if isinstance(value, str) and len(value) > 0:
-            self._category = value
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute('UPDATE magazines SET category = ? WHERE id = ?', (self._category, self._id))
-            conn.commit()
-            conn.close()
-        else:
-            raise ValueError("Category must be a non-empty string")
+        if not isinstance(value, str):
+            raise ValueError("Category must be a string")
+        if len(value) == 0:
+            raise ValueError("Category must be longer than 0")
+        self._category = value
 
+    def save(self):
+        if not self.name or not self.category:
+            raise ValueError("Name and category must be set before saving")
+        sql = "INSERT INTO magazines(name, category) VALUES (?, ?)"
+        CURSOR.execute(sql, (self.name, self.category))
+        CONN.commit()
+        self.id = CURSOR.lastrowid
+    
     def articles(self):
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT * FROM articles WHERE magazine_id = ?
-        ''', (self._id,))
-        articles = cursor.fetchall()
-        conn.close()
-        return [article(article["id"], article["title"], article["content"], article["author_id"], article["magazine_id"]) for article in articles]
+        if not self.id:
+            raise ValueError("ID must be set before fetching articles")
+        sql = "SELECT * FROM articles WHERE magazine_id = ?"
+        CURSOR.execute(sql, (self.id,))
+        articles = CURSOR.fetchall()
+        return articles
 
     def contributors(self):
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT DISTINCT authors.* FROM authors
-            JOIN articles ON articles.author_id = authors.id
-            WHERE articles.magazine_id = ?
-        ''', (self._id,))
-        authors = cursor.fetchall()
-        conn.close()
-        return [author(author["id"], author["name"]) for author in authors]
+        if not self.id:
+            raise ValueError("ID must be set before fetching contributors")
+        sql = "SELECT DISTINCT authors.* FROM authors JOIN articles ON authors.id = articles.author_id WHERE articles.magazine_id = ?"
+        CURSOR.execute(sql, (self.id,))
+        contributors = CURSOR.fetchall()
+        return [Author(*contributor) for contributor in contributors]
 
-    def _repr_(self):
+    def __repr__(self):
         return f'<Magazine {self.name}>'
+
+
