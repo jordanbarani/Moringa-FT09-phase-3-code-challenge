@@ -1,71 +1,41 @@
-from connection2 import CONN, CURSOR
-from author import Author 
+from models.connection2 import get_db_connection
 
 class Magazine:
-    def __init__(self, name, category, id=None):
-        self._id = id
+    def __init__(self, name, category):
         self.name = name
         self.category = category
+        self.id = None  # Initialize id as None
 
-    @property
-    def id(self):
-        return self._id
+        self._create_in_db()
 
-    @id.setter
-    def id(self, value):
-        if not isinstance(value, int):
-            raise ValueError("ID must be of type int")
-        self._id = value
+    def _create_in_db(self):
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO magazines (name, category) VALUES (?, ?)', (self.name, self.category))
+        # Retrieve the id of the newly inserted row
+        self.id = cursor.lastrowid
+        conn.commit()
+        conn.close()
 
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        if not isinstance(value, str):
-            raise ValueError("Name must be a string")
-        if len(value) < 2 or len(value) > 16:
-            raise ValueError("Name must be between 2 and 16 characters, inclusive")
-        self._name = value
-
-    @property
-    def category(self):
-        return self._category
-    
-    @category.setter
-    def category(self, value):
-        if not isinstance(value, str):
-            raise ValueError("Category must be a string")
-        if len(value) == 0:
-            raise ValueError("Category must be longer than 0")
-        self._category = value
-
-    def save(self):
-        if not self.name or not self.category:
-            raise ValueError("Name and category must be set before saving")
-        sql = "INSERT INTO magazines(name, category) VALUES (?, ?)"
-        CURSOR.execute(sql, (self.name, self.category))
-        CONN.commit()
-        self.id = CURSOR.lastrowid
-    
     def articles(self):
-        if not self.id:
-            raise ValueError("ID must be set before fetching articles")
-        sql = "SELECT * FROM articles WHERE magazine_id = ?"
-        CURSOR.execute(sql, (self.id,))
-        articles = CURSOR.fetchall()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM articles WHERE magazine_id = ?', (self.id,))
+        articles = cursor.fetchall()
+        conn.close()
         return articles
 
     def contributors(self):
-        if not self.id:
-            raise ValueError("ID must be set before fetching contributors")
-        sql = "SELECT DISTINCT authors.* FROM authors JOIN articles ON authors.id = articles.author_id WHERE articles.magazine_id = ?"
-        CURSOR.execute(sql, (self.id,))
-        contributors = CURSOR.fetchall()
-        return [Author(*contributor) for contributor in contributors]
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT DISTINCT authors.* FROM authors
+            JOIN articles ON articles.author_id = authors.id
+            WHERE articles.magazine_id = ?
+        ''', (self.id,))
+        authors = cursor.fetchall()
+        conn.close()
+        return authors
 
     def __repr__(self):
         return f'<Magazine {self.name}>'
-
-

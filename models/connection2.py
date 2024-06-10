@@ -1,4 +1,8 @@
 import sqlite3
 
-CONN = sqlite3.connect('/home/tk/Development/Canvas assignments/phase-3/code-challenge/Moringa-FT09-phase-3-code-challenge/database/magazine.db')
-CURSOR = CONN.cursor()
+DATABASE_NAME = './database/magazine.db'
+
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
